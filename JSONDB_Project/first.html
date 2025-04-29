@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shipment Management Form</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script
+        src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script
+        src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h2>Shipment Management Form</h2>
+    <form id="shipmentForm">
+        <div class="form-group">
+            <label for="shipmentNo">Shipment No. (Primary Key)</label>
+            <input type="text" class="form-control" id="shipmentNo" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <input type="text" class="form-control" id="description" disabled>
+        </div>
+        <div class="form-group">
+            <label for="source">Source</label>
+            <input type="text" class="form-control" id="source" disabled>
+        </div>
+        <div class="form-group">
+            <label for="destination">Destination</label>
+            <input type="text" class="form-control" id="destination" disabled>
+        </div>
+        <div class="form-group">
+            <label for="shippingDate">Shipping Date</label>
+            <input type="date" class="form-control" id="shippingDate" disabled>
+        </div>
+        <div class="form-group">
+            <label for="expectedDate">Expected Delivery Date</label>
+            <input type="date" class="form-control" id="expectedDate" disabled>
+        </div>
+        <button type="button" id="saveBtn" class="btn btn-success" onclick="saveShipment()" disabled>Save</button>
+        <button type="button" id="updateBtn" class="btn btn-primary" onclick="updateShipment()" disabled>Update</button>
+        <button type="button" id="resetBtn" class="btn btn-warning" onclick="resetForm()" disabled>Reset</button>
+    </form>
+</div>
+
+<script>
+const baseUrl = "http://api.login2explore.com:5577";
+const dbName = "DELIVERY-DB";
+const relName = "SHIPMENT-TABLE";
+const connToken = "90934716|-31949208385986547|90956267";
+const jpdbIRL = "/api/irl";
+const jpdbIML = "/api/iml";
+
+var recNoGlobal = null;
+
+$(document).ready(function () {
+    resetForm();
+    $("#shipmentNo").focus();
+
+    $("#shipmentNo").on("change", function () {
+        checkShipment();
+    });
+});
+
+function resetForm() {
+    $("#shipmentForm")[0].reset();
+    $("#shipmentNo").prop("disabled", false).focus();
+    disableFields();
+    $("#saveBtn, #updateBtn, #resetBtn").prop("disabled", true);
+}
+
+function disableFields() {
+    $("#description, #source, #destination, #shippingDate, #expectedDate").prop("disabled", true);
+}
+
+function enableFields() {
+    $("#description, #source, #destination, #shippingDate, #expectedDate").prop("disabled", false);
+}
+
+function createGETRequest(token, dbName, relName, jsonObj) {
+    return JSON.stringify({
+        token,
+        cmd: "GET_BY_KEY",
+        dbName,
+        rel: relName,
+        jsonStr: JSON.stringify(jsonObj)
+    });
+}
+
+function createPUTRequest(token, jsonObj, dbName, relName) {
+    return JSON.stringify({
+        token,
+        dbName,
+        rel: relName,
+        cmd: "PUT",
+        jsonStr: JSON.stringify(jsonObj)
+    });
+}
+
+function createUPDATERequest(token, jsonObj, dbName, relName, recNo) {
+    return JSON.stringify({
+        token,
+        dbName,
+        rel: relName,
+        cmd: "UPDATE",
+        rec_no: recNo,
+        jsonStr: JSON.stringify(jsonObj)
+    });
+}
+
+function executeCommand(reqStr, api) {
+    var result = "";
+    $.ajax({
+        url: baseUrl + api,
+        type: "POST",
+        data: reqStr,
+        async: false,
+        contentType: "application/json",
+        success: function (res) {
+            result = res;
+        },
+        error: function () {
+            alert("Server error");
+        }
+    });
+    return result;
+}
+
+function getFormData() {
+    const data = {
+        shipmentNo: $("#shipmentNo").val(),
+        description: $("#description").val(),
+        source: $("#source").val(),
+        destination: $("#destination").val(),
+        shippingDate: $("#shippingDate").val(),
+        expectedDate: $("#expectedDate").val()
+    };
+
+    for (let key in data) {
+        if (!data[key]) {
+            alert("Please fill all fields!");
+            return null;
+        }
+    }
+
+    return {
+        id: data.shipmentNo,
+        description: data.description,
+        source: data.source,
+        destination: data.destination,
+        shippingDate: data.shippingDate,
+        expectedDate: data.expectedDate
+    };
+}
+
+function fillForm(data) {
+    $("#description").val(data.description);
+    $("#source").val(data.source);
+    $("#destination").val(data.destination);
+    $("#shippingDate").val(data.shippingDate);
+    $("#expectedDate").val(data.expectedDate);
+}
+
+function checkShipment() {
+    const id = $("#shipmentNo").val();
+    if (!id) {
+        alert("Shipment No. is required");
+        return;
+    }
+
+    const reqStr = createGETRequest(connToken, dbName, relName, { id });
+    const res = executeCommand(reqStr, jpdbIRL);
+
+    if (res && res.data) {
+        recNoGlobal = res.data.rec_no;
+        fillForm(res.data.record);
+        enableFields();
+        $("#shipmentNo").prop("disabled", true);
+        $("#updateBtn, #resetBtn").prop("disabled", false);
+        $("#description").focus();
+    } else {
+        enableFields();
+        $("#saveBtn, #resetBtn").prop("disabled", false);
+        $("#shipmentNo").prop("disabled", true);
+        $("#description").focus();
+    }
+}
+
+function saveShipment() {
+    const data = getFormData();
+    if (!data) return;
+
+    const reqStr = createPUTRequest(connToken, data, dbName, relName);
+    const res = executeCommand(reqStr, jpdbIML);
+    alert("Shipment saved successfully.");
+    resetForm();
+}
+
+function updateShipment() {
+    const data = getFormData();
+    if (!data || recNoGlobal === null) return;
+
+    const reqStr = createUPDATERequest(connToken, data, dbName, relName, recNoGlobal);
+    const res = executeCommand(reqStr, jpdbIML);
+    alert("Shipment updated successfully.");
+    resetForm();
+}
+</script>
+</body>
+</html>
